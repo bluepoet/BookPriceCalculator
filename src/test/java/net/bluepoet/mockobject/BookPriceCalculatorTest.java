@@ -21,6 +21,7 @@ public class BookPriceCalculatorTest {
     public void calculate() throws Exception {
         // Given
         BookPriceCalculator calculator = new BookPriceCalculator();
+
         UserService userService = new UserServiceImpl();
         BookService bookService = new BookServiceImpl();
         CategoryService categoryService = new CategoryServiceImpl();
@@ -66,7 +67,7 @@ public class BookPriceCalculatorTest {
     }
 
     private interface UserService {
-        User getUserByNo(String id);
+        User getUserByNo(String no);
     }
 
     private class UserServiceImpl implements UserService {
