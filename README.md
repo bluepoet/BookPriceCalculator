@@ -8,9 +8,9 @@
 
 # 개발환경
 
-MacBook Pro OS X Yosemite
-jdk8
-IntelliJ 14 
+* MacBook Pro OS X Yosemite
+* jdk8
+* IntelliJ 14 
 
 # 브랜치 설명
 
