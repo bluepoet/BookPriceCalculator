@@ -1,5 +1,6 @@
 package net.bluepoet.mockobject;
 
+import com.google.common.collect.Lists;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
@@ -24,13 +25,16 @@ public class BookPriceCalculatorTest {
         BookService bookService = new BookServiceImpl();
         CategoryService categoryService = new CategoryServiceImpl();
         bookService.setCategoryService(categoryService);
+        PaymentService paymentService = new PaymentServiceImpl();
+        Payment payment = new MasterCardPayment();
+        paymentService.setPayment(payment);
+
         calculator.setUserService(userService);
         calculator.setBookService(bookService);
-        Coupon coupon = new Coupon(1, 2, 0.1);
-        Payment payment = new MasterCardPayment();
+        calculator.setPaymentService(paymentService);
 
         // When
-        int result = calculator.calculate("bluepoet", 1, coupon, payment);
+        int result = calculator.calculate("bluepoet", 1);
 
         // Then
         assertThat(result).isEqualTo(7695);
@@ -40,33 +44,38 @@ public class BookPriceCalculatorTest {
     private class BookPriceCalculator {
         private UserService userService;
         private BookService bookService;
+        private PaymentService paymentService;
 
-        public int calculate(String userId, int bookNo, Coupon coupon, Payment payment) {
+        public int calculate(String userNo, int bookNo) {
             double totalPrice = 0;
             Book book = bookService.getBookByNo(1);
-            User user = userService.getUserById(userId);
-            user.addCoupon(coupon);
+            User user = userService.getUserByNo(userNo);
 
             if (user.hasPoint()) {
                 totalPrice = book.getPrice() - user.getPoint();
             }
 
-            if (coupon.isAppliable(book)) {
-                totalPrice = totalPrice - (totalPrice * coupon.getDiscountRate());
+            if (user.getCoupons().isPresent()) {
+                for (Coupon c : user.getCoupons().get()) {
+                    totalPrice = totalPrice - (totalPrice * c.getDiscountRate());
+                }
             }
 
-            return payment.pay(new Double(totalPrice).intValue());
+            return paymentService.pay(new Double(totalPrice).intValue());
         }
     }
 
     private interface UserService {
-        User getUserById(String id);
+        User getUserByNo(String id);
     }
 
     private class UserServiceImpl implements UserService {
         @Override
-        public User getUserById(String userId) {
-            return new User("bluepoet", "김용훈", 1000);
+        public User getUserByNo(String userNo) {
+            User user = new User("bluepoet", "김용훈", 1000);
+            Coupon coupon = new Coupon(1, 2, 0.1);
+            user.setCoupons(Optional.of(Lists.newArrayList(coupon)));
+            return user;
         }
     }
 
@@ -148,6 +157,25 @@ public class BookPriceCalculatorTest {
         private String name;
     }
 
+    private interface PaymentService {
+        void setPayment(Payment payment);
+
+        int pay(int price);
+    }
+
+    private class PaymentServiceImpl implements PaymentService {
+        private Payment payment;
+
+        public void setPayment(Payment payment) {
+            this.payment = payment;
+        }
+
+        @Override
+        public int pay(int price) {
+            return payment.pay(price);
+        }
+    }
+
     @Data
     private class Payment {
         private Optional<Double> discountRate = Optional.empty();
@@ -169,6 +197,9 @@ public class BookPriceCalculatorTest {
         }
     }
 
+    private class NormalCardPayment extends Payment {
+    }
+
     private class AccountTransferPayment extends Payment {
     }
 
@@ -181,6 +212,10 @@ public class BookPriceCalculatorTest {
 
         public boolean isAppliable(Book book) {
             return book.getCategories().stream().anyMatch(c -> c.getNo() == this.categoryNo);
+        }
+
+        public double discountPrice(double price) {
+            return price - (price * getDiscountRate());
         }
     }
 }
