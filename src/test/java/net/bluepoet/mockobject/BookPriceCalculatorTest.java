@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -16,29 +17,132 @@ import java.util.Optional;
  * Created by poet.me on 15. 12. 24..
  */
 public class BookPriceCalculatorTest {
+    private BookPriceCalculator calculator;
+    private UserService userService;
+    private BookService bookService;
+    private CategoryService categoryService;
+    private PaymentService paymentService;
 
-    @Test
-    public void calculate() throws Exception {
-        // Given
-        BookPriceCalculator calculator = new BookPriceCalculator();
-
-        UserService userService = new UserServiceImpl();
-        BookService bookService = new BookServiceImpl();
-        CategoryService categoryService = new CategoryServiceImpl();
+    @Before
+    public void setUp() throws Exception {
+        calculator = new BookPriceCalculator();
+        userService = new UserServiceImpl();
+        bookService = new BookServiceImpl();
+        categoryService = new CategoryServiceImpl();
         bookService.setCategoryService(categoryService);
-        PaymentService paymentService = new PaymentServiceImpl();
-        Payment payment = new MasterCardPayment();
+        paymentService = new PaymentServiceImpl();
+        Payment payment = new NormalCardPayment();
         paymentService.setPayment(payment);
 
         calculator.setUserService(userService);
         calculator.setBookService(bookService);
         calculator.setPaymentService(paymentService);
+    }
 
+    @Test
+    public void calculate_has_one_coupon_and_has_point_user() throws Exception {
+        // Given
         // When
-        int result = calculator.calculate("bluepoet", 1);
+        int result = calculator.calculate(1, 1);
 
         // Then
-        assertThat(result).isEqualTo(7695);
+        assertThat(result).isEqualTo(8100);
+    }
+
+    @Test
+    public void calculate_has_many_coupon_and_has_point_user() throws Exception {
+        // Given
+        // When
+        int result = calculator.calculate(5, 1);
+
+        // Then
+        assertThat(result).isEqualTo(5760);
+    }
+
+    @Test
+    public void calculate_no_coupon_and_has_point_user() throws Exception {
+        // Given
+        // When
+        int result = calculator.calculate(2, 1);
+
+        // Then
+        assertThat(result).isEqualTo(9950);
+    }
+
+    @Test
+    public void calculate_no_coupon_and_no_point_user() throws Exception {
+        // Given
+        // When
+        int result = calculator.calculate(3, 1);
+
+        // Then
+        assertThat(result).isEqualTo(10000);
+    }
+
+    @Test
+    public void calculate_no_user() throws Exception {
+        // Given
+        // When
+        int result = calculator.calculate(4, 1);
+
+        // Then
+        assertThat(result).isEqualTo(0);
+    }
+
+    @Test
+    public void calculate_has_many_coupon_and_no_point_and_no_match_category() throws Exception {
+        // Given
+        // When
+        int result = calculator.calculate(6, 1);
+
+        // Then
+        assertThat(result).isEqualTo(10000);
+    }
+
+    @Test
+    public void calculate_no_book() throws Exception {
+        // Given
+        // When
+        int result = calculator.calculate(6, 2);
+
+        // Then
+        assertThat(result).isEqualTo(0);
+    }
+
+    @Test
+    public void calculate_has_many_coupon_and_has_point_and_masterCard_payment_user() throws Exception {
+        // Given
+        paymentService.setPayment(new MasterCardPayment());
+
+        // When
+        int result = calculator.calculate(5, 1);
+
+        // Then
+        assertThat(result).isEqualTo(5472);
+    }
+
+    @Test
+    public void calculate_has_many_coupon_and_has_point_and_visaCard_payment_user() throws Exception {
+        // Given
+        paymentService.setPayment(new VisaCardPayment());
+
+        // When
+        int result = calculator.calculate(5, 1);
+
+        // Then
+        assertThat(result).isEqualTo(5299);
+    }
+
+    @Test
+    public void calculate_has_many_coupon_and_has_point_and_accountTransfer_payment_user() throws Exception {
+        // Given
+        paymentService.setPayment(new AccountTransferPayment());
+
+        // When
+        int result = calculator.calculate(5, 1);
+
+        // Then
+        assertThat(result).isEqualTo(5760);
     }
 
     @Data
@@ -47,18 +151,26 @@ public class BookPriceCalculatorTest {
         private BookService bookService;
         private PaymentService paymentService;
 
-        public int calculate(String userNo, int bookNo) {
+        public int calculate(int userNo, int bookNo) {
+            Optional<Book> book = bookService.getBookByNo(bookNo);
+            Optional<User> user = userService.getUserByNo(userNo);
             double totalPrice = 0;
-            Book book = bookService.getBookByNo(1);
-            User user = userService.getUserByNo(userNo);
 
-            if (user.hasPoint()) {
-                totalPrice = book.getPrice() - user.getPoint();
+            if (!book.isPresent() || !user.isPresent()) {
+                return new Double(totalPrice).intValue();
+            } else {
+                totalPrice = book.get().getPrice();
             }
 
-            if (user.getCoupons().isPresent()) {
-                for (Coupon c : user.getCoupons().get()) {
-                    totalPrice = totalPrice - (totalPrice * c.getDiscountRate());
+            if (user.get().hasPoint()) {
+                totalPrice = book.get().getPrice() - user.get().getPoint();
+            }
+
+            if (user.get().getCoupons().isPresent()) {
+                for (Coupon c : user.get().getCoupons().get()) {
+                    if (c.isAppliable(book.get())) {
+                        totalPrice = totalPrice - (totalPrice * c.getDiscountRate());
+                    }
                 }
             }
 
@@ -67,16 +179,36 @@ public class BookPriceCalculatorTest {
     }
 
     private interface UserService {
-        User getUserByNo(String no);
+        Optional<User> getUserByNo(int no);
     }
 
     private class UserServiceImpl implements UserService {
         @Override
-        public User getUserByNo(String userNo) {
-            User user = new User("bluepoet", "김용훈", 1000);
-            Coupon coupon = new Coupon(1, 2, 0.1);
-            user.setCoupons(Optional.of(Lists.newArrayList(coupon)));
-            return user;
+        public Optional<User> getUserByNo(int userNo) {
+            if (userNo == 1) {
+                User user = new User("bluepoet", "김용훈", 1000);
+                Coupon coupon = new Coupon(1, 2, 0.1);
+                user.setCoupons(Optional.of(Lists.newArrayList(coupon)));
+                return Optional.of(user);
+            } else if (userNo == 2) {
+                return Optional.of(new User("kakao", "카카오", 50));
+            } else if (userNo == 3) {
+                return Optional.of(new User("test", "테스트", 0));
+            } else if (userNo == 5) {
+                User user = new User("mock", "목테스트", 2000);
+                Coupon coupon = new Coupon(1, 2, 0.1);
+                Coupon otherCoupon = new Coupon(2, 3, 0.2);
+                user.setCoupons(Optional.of(Lists.newArrayList(coupon, otherCoupon)));
+                return Optional.of(user);
+            } else if (userNo == 6) {
+                User user = new User("mock1", "목테스트1", 0);
+                Coupon coupon = new Coupon(3, 4, 0.1);
+                Coupon otherCoupon = new Coupon(4, 5, 0.2);
+                user.setCoupons(Optional.of(Lists.newArrayList(coupon, otherCoupon)));
+                return Optional.of(user);
+            }
+
+            return Optional.empty();
         }
     }
 
@@ -107,7 +239,7 @@ public class BookPriceCalculatorTest {
     private interface BookService {
         void setCategoryService(CategoryService categoryService);
 
-        Book getBookByNo(int no);
+        Optional<Book> getBookByNo(int no);
     }
 
     private class BookServiceImpl implements BookService {
@@ -118,9 +250,13 @@ public class BookPriceCalculatorTest {
         }
 
         @Override
-        public Book getBookByNo(int no) {
-            List<Category> categories = categoryService.getCategoriesByBookNo(1);
-            return new Book(1, 10000, "테스트북", categories);
+        public Optional<Book> getBookByNo(int no) {
+            if (no == 1) {
+                List<Category> categories = categoryService.getCategoriesByBookNo(1);
+                return Optional.of(new Book(1, 10000, "테스트북", categories));
+            }
+
+            return Optional.empty();
         }
     }
 
@@ -213,10 +349,6 @@ public class BookPriceCalculatorTest {
 
         public boolean isAppliable(Book book) {
             return book.getCategories().stream().anyMatch(c -> c.getNo() == this.categoryNo);
-        }
-
-        public double discountPrice(double price) {
-            return price - (price * getDiscountRate());
         }
     }
 }
