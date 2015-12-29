@@ -11,6 +11,12 @@
 * MacBook Pro OS X Yosemite
 * jdk8
 * IntelliJ 14 
+* lombok 1.16.6(Lombok Plugin 설치해야 함)
+
+##### Intellij에서 lombok plugin 설치 후 확인사항
+
+* Default Preferences > Lombok plugin > Enable Lombok plugin for this project 체크 확인
+* Default Preferences > Build, Execution, Deployment > Compiler > Annotation Processors > Enable annotation processing 체크 확인
 
 # 브랜치 설명
 
