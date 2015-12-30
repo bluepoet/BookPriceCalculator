@@ -89,6 +89,19 @@ public class BookPriceCalculatorMockitoTest {
     }
 
     @Test
+    public void calculate_has_many_coupon_and_no_point_and_no_match_category() throws Exception {
+        // Given
+        given(userService.getUserByNo(6)).willReturn(createNoMatchCategoryUser());
+
+        // When
+        int result = calculator.calculate(6, 1);
+
+        // Then
+        assertThat(result).isEqualTo(10000);
+        verifySpyActions();
+    }
+
+    @Test
     public void calculate_no_coupon_and_has_point_user() throws Exception {
         // Given
         given(userService.getUserByNo(2)).willReturn(createNoCouponAndHasPointUser());
@@ -128,19 +141,6 @@ public class BookPriceCalculatorMockitoTest {
         verify(userService, times(1)).getUserByNo(anyInt());
         verify(bookService, times(1)).getBookByNo(anyInt());
         verify(paymentService, never()).pay(anyInt());
-    }
-
-    @Test
-    public void calculate_has_many_coupon_and_no_point_and_no_match_category() throws Exception {
-        // Given
-        given(userService.getUserByNo(6)).willReturn(createNoMatchCategoryUser());
-
-        // When
-        int result = calculator.calculate(6, 1);
-
-        // Then
-        assertThat(result).isEqualTo(10000);
-        verifySpyActions();
     }
 
     @Test
