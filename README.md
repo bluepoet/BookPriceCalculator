@@ -32,5 +32,5 @@ Spock Framework Enhancements은 번들 플러그인이 아니므로 Browse repos
 # 브랜치 설명
 
 - develop_v0.1 : 최초 요구된 기능구현에 초점을 맞춤
-- develop_v0.2 : 다양한 테스트케이스를 목 오브젝트를 DI(Dependency Injection)하는 방법으루 구현
+- develop_v0.2 : 다양한 테스트케이스를 목 오브젝트를 DI(Dependency Injection)하는 방법으로 구현
 - develop_v0.3 : Mock Framework인 Mockito와 Testing and Specification Framework인 Spock을 이용하여 테스트코드 재작성함
