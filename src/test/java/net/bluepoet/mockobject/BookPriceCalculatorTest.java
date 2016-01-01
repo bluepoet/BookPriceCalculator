@@ -4,7 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+
 import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -20,17 +22,22 @@ public class BookPriceCalculatorTest {
     public void calculate() throws Exception {
         // Given
         BookPriceCalculator calculator = new BookPriceCalculator();
-        UserService userService = new UserServiceImpl();
-        BookService bookService = new BookServiceImpl();
-        CategoryService categoryService = new CategoryServiceImpl();
+        UserService userService = new MockUserServiceImpl();
+        BookService bookService = new MockBookServiceImpl();
+        CategoryService categoryService = new MockCategoryServiceImpl();
         bookService.setCategoryService(categoryService);
+        Payment payment = new MasterCardPayment();
+        PaymentService paymentService = new MockPaymentServiceImpl();
+        paymentService.setPayment(payment);
+
         calculator.setUserService(userService);
         calculator.setBookService(bookService);
+        calculator.setPaymentService(paymentService);
+
         Coupon coupon = new Coupon(1, 2, 0.1);
-        Payment payment = new MasterCardPayment();
 
         // When
-        int result = calculator.calculate("bluepoet", 1, coupon, payment);
+        int result = calculator.calculate(1, 1, coupon);
 
         // Then
         assertThat(result).isEqualTo(7695);
@@ -40,11 +47,12 @@ public class BookPriceCalculatorTest {
     private class BookPriceCalculator {
         private UserService userService;
         private BookService bookService;
+        private PaymentService paymentService;
 
-        public int calculate(String userId, int bookNo, Coupon coupon, Payment payment) {
+        public int calculate(int userNo, int bookNo, Coupon coupon) {
             double totalPrice = 0;
             Book book = bookService.getBookByNo(1);
-            User user = userService.getUserById(userId);
+            User user = userService.getUserByNo(userNo);
             user.addCoupon(coupon);
 
             if (user.hasPoint()) {
@@ -55,17 +63,17 @@ public class BookPriceCalculatorTest {
                 totalPrice = totalPrice - (totalPrice * coupon.getDiscountRate());
             }
 
-            return payment.pay(new Double(totalPrice).intValue());
+            return paymentService.pay(new Double(totalPrice).intValue());
         }
     }
 
     private interface UserService {
-        User getUserById(String id);
+        User getUserByNo(int no);
     }
 
-    private class UserServiceImpl implements UserService {
+    private class MockUserServiceImpl implements UserService {
         @Override
-        public User getUserById(String userId) {
+        public User getUserByNo(int no) {
             return new User("bluepoet", "김용훈", 1000);
         }
     }
@@ -100,7 +108,7 @@ public class BookPriceCalculatorTest {
         Book getBookByNo(int no);
     }
 
-    private class BookServiceImpl implements BookService {
+    private class MockBookServiceImpl implements BookService {
         private CategoryService categoryService;
 
         public void setCategoryService(CategoryService categoryService) {
@@ -127,7 +135,7 @@ public class BookPriceCalculatorTest {
         List<Category> getCategoriesByBookNo(int no);
     }
 
-    public class CategoryServiceImpl implements CategoryService {
+    public class MockCategoryServiceImpl implements CategoryService {
 
         @Override
         public List<Category> getCategoriesByBookNo(int no) {
@@ -181,6 +189,26 @@ public class BookPriceCalculatorTest {
 
         public boolean isAppliable(Book book) {
             return book.getCategories().stream().anyMatch(c -> c.getNo() == this.categoryNo);
+        }
+    }
+
+    private interface PaymentService {
+        void setPayment(Payment payment);
+
+        int pay(int price);
+    }
+
+    private class MockPaymentServiceImpl implements PaymentService {
+        private Payment payment;
+
+        @Override
+        public void setPayment(Payment payment) {
+            this.payment = payment;
+        }
+
+        @Override
+        public int pay(int price) {
+            return payment.pay(price);
         }
     }
 }
