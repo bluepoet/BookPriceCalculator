@@ -41,4 +41,12 @@ public class BookPriceCalculator {
 
         return paymentService.pay(new Double(totalPrice).intValue());
     }
+
+    private boolean testMethod(int i) {
+        if(i == 0) {
+            return true;
+        }
+
+        return false;
+    }
 }
