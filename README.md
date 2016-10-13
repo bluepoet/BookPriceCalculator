@@ -4,7 +4,7 @@
 
 # 프로젝트 설명자료
 
-[목 오브젝트의 이해](http://www.slideshare.net/yonghoonkim940/mock-object-56624509)
+[목 오브젝트의 이해](http://)
 
 # 개발환경
 
